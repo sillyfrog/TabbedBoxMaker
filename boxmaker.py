@@ -95,6 +95,11 @@ def log(text):
             f.write(text + "\n")
 
 
+def fatal_error(text):
+    inkex.errormsg(text)
+    exit(1)
+
+
 def newGroup(canvas, group_id=None):
     # Create a new group and add element created from line string
     if group_id is None:
@@ -260,6 +265,7 @@ def side(
     dividerSpacing,
     color=DEFAULT_COLOR,
     cutouts=None,
+    cutouts_rotate=False,
     labels=None,
 ):
     rootX, rootY = root
@@ -340,8 +346,8 @@ def side(
             ((tabDivision % 2) ^ (not isTab)) and numDividers > 0 and not isDivider
         ):  # draw holes for divider tabs to key into side walls
             w = gapWidth if isTab else tabWidth
-            if tabDivision == 1 and tabSymmetry == 0:
-                w -= startOffsetX * thickness
+            # if tabDivision == 1 and tabSymmetry == 0:
+            # w -= startOffsetX * thickness
             holeLenX = dirX * w + notDirX * firstVec + first * dirX
             holeLenY = dirY * w + notDirY * firstVec + first * dirY
             if first:
@@ -536,7 +542,7 @@ def side(
     )
     if cutouts:
         s = f"M {vectorX},{vectorY} "
-        r = -1 if isDivider else 1
+        r = -1 if cutouts_rotate else 1
         for cutout in cutouts:
             cutx = cutout[1]
             cuty = cutout[2] / 2 * r
@@ -912,6 +918,11 @@ class BoxMaker(inkex.Effect):
         else:
             labels = None
 
+        if inside and labels:
+            fatal_error("If using labels, you cannot use inside dimensions")
+        if labels and self.options.keydiv == 3:
+            fatal_error("If using labels, you must use dividers into All Sides")
+
         font_style = self.options.label_font_style
         include_label_front = self.options.include_label_front
         line_break_on_space = self.options.line_break_on_space
@@ -1117,7 +1128,22 @@ class BoxMaker(inkex.Effect):
             if not hasRt:
                 reduceOffsets(cc, 2, 0, 0, 1)
             if hasBk:
-                pieces.append([cc[1], rr[2], X, Z, bkTabInfo, bkTabbed, bkFace])
+                piece = [
+                    cc[1],
+                    rr[2],
+                    X,
+                    Z,
+                    bkTabInfo,
+                    bkTabbed,
+                    bkFace,
+                    "panel_back",
+                    None,
+                ]
+                if include_cutout_front:
+                    piece.append(cutouts)
+                else:
+                    piece.append(None)
+                pieces.append(piece)
             if hasLt:
                 pieces.append([cc[0], rr[1], Z, Y, ltTabInfo, ltTabbed, ltFace])
             if hasBm:
@@ -1203,7 +1229,12 @@ class BoxMaker(inkex.Effect):
             if color is None:
                 color = DEFAULT_COLOR
 
-            div_cutouts = piece[DIV_CUTOUTS]
+            a_cutouts = None
+            c_cutouts = None
+            if group_id == "panel_front":
+                a_cutouts = piece[DIV_CUTOUTS]
+            elif group_id == "panel_back":
+                c_cutouts = piece[DIV_CUTOUTS]
 
             div_labels = piece[DIV_LABELS]
 
@@ -1282,7 +1313,7 @@ class BoxMaker(inkex.Effect):
                 0,
                 (keydivfloor | wall) * (keydivwalls | floor) * divx * yholes * atabs,
                 yspacing,
-                cutouts=div_cutouts,
+                cutouts=a_cutouts,
                 color=color,
                 labels=div_labels,
             )  # side a
@@ -1316,6 +1347,8 @@ class BoxMaker(inkex.Effect):
                     0,
                     0,
                     color=color,
+                    cutouts=c_cutouts,
+                    cutouts_rotate=True,
                 )  # side c
             else:
                 side(
@@ -1448,6 +1481,7 @@ class BoxMaker(inkex.Effect):
                         0,
                         0,
                         cutouts=cutouts,
+                        cutouts_rotate=True,
                     )  # side c
                     side(
                         group,

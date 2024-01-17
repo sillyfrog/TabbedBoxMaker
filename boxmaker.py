@@ -83,6 +83,8 @@ COLOR = 8
 DIV_CUTOUTS = 9
 DIV_LABELS = 10
 
+os.environ["SCHROFF_LOG"] = "/tmp/log.txt"
+
 
 def log(text):
     log_pth = os.environ.get("SCHROFF_LOG")
@@ -140,7 +142,7 @@ _text_id_counter = 0
 
 
 def generateTextLines(
-    s: str, x: float, y: float, text_id=None, newline_chr=" ", style=None
+    s: str, x: float, y: float, text_id=None, newline_chr=" ", style=None, rotate=False
 ):
     global _text_id_counter
     if text_id is None:
@@ -161,15 +163,18 @@ def generateTextLines(
     t.set("x", x)
     t.set("y", y)
     t.set("style", style)
+    if rotate:
+        # Rotate the text 180 degrees
+        t.set("transform", f"rotate(180, {x}, {y})")
     return t
 
 
-def addText(s: str, x: float, y: float, text_id=None, style=None):
+def addText(s: str, x: float, y: float, text_id=None, style=None, rotate=False):
     if line_break_on_space:
         newline_chr = " "
     else:
         newline_chr = "\n"
-    labeltext.append(generateTextLines(s, x, y, text_id, newline_chr, style))
+    labeltext.append(generateTextLines(s, x, y, text_id, newline_chr, style, rotate))
 
 
 def generateTextPaths():
@@ -529,19 +534,28 @@ def side(
     )
     if cutouts:
         s = f"M {vectorX},{vectorY} "
+        r = -1 if isDivider else 1
         for cutout in cutouts:
             cutx = cutout[1]
-            cuty = cutout[2] / 2
-            x = vectorX + cutout[0] - cutx / 2
+            cuty = cutout[2] / 2 * r
+            x = vectorX + (cutout[0] - cutx / 2) * r
+            # x = vectorX - cutout[0] + cutx / 2
             y = vectorY
-            s += f"L {x},{y} L {x},{y+cuty} C {x},{y+cuty*2} {x+cutx},{y+cuty*2} {x+cutx},{y+cuty} L {x+cutx},{y}"
+            s += f"L {x},{y} L {x},{y+cuty} C {x},{y+cuty*2} {x+cutx*r},{y+cuty*2} {x+cutx*r},{y+cuty} L {x+cutx*r},{y}"
         s += f"L {rootX + endOffsetX * thickness + dirX * length},{rootY + endOffsetY * thickness + dirY * length}"
+        log("XXX: " + s)
     if labels is not None:
         log(f"Labels: {labels}")
         gid = group.get("id")
         i = 0
-        for label, labelx in labels[: (divy + 1)]:
-            addText(label, vectorX + labelx, vectorY, f"label_{gid}_{i}")
+        for label, labelx, labely in labels[: (divy + 1)]:
+            addText(
+                label,
+                vectorX + labelx,
+                vectorY + labely,
+                f"label_{gid}_{i}",
+                rotate=isDivider,
+            )
             i += 1
     group.add(getLine(s, color))
 
@@ -1134,6 +1148,7 @@ class BoxMaker(inkex.Effect):
                             (
                                 label_text,
                                 i * (div_face_width + thickness) + thickness,
+                                0,
                             )
                         )
                     piece.append(div_labels)
@@ -1378,18 +1393,22 @@ class BoxMaker(inkex.Effect):
                             div_labels.append(
                                 (
                                     label_text,
-                                    i * (div_face_width + thickness) + thickness,
+                                    i * (div_face_width + thickness)
+                                    + thickness
+                                    + div_face_width,
+                                    Z - thickness,
                                 )
                             )
                         log(f"div_labels: {div_labels}")
                     else:
                         div_labels = None
+                    log(f"a: {a}, c: {c}, atabs: {atabs}, ctabs: {ctabs}")
                     side(
                         group,
                         (x, y),
                         (d, a),
                         (-b, a),
-                        keydivfloor * ctabs * (-thickness if a else thickness),
+                        keydivfloor * atabs * (-thickness if a else thickness),
                         dtabs,
                         dx,
                         (1, 0),
@@ -1397,7 +1416,6 @@ class BoxMaker(inkex.Effect):
                         1,
                         0,
                         0,
-                        cutouts=cutouts,
                         labels=div_labels,
                     )  # side a
                     side(
@@ -1419,7 +1437,7 @@ class BoxMaker(inkex.Effect):
                         (x + dx, y + dy),
                         (-b, -c),
                         (d, -c),
-                        keydivfloor * atabs * (thickness if c else -thickness),
+                        keydivfloor * ctabs * (thickness if c else -thickness),
                         btabs,
                         dx,
                         (-1, 0),
@@ -1427,6 +1445,7 @@ class BoxMaker(inkex.Effect):
                         1,
                         0,
                         0,
+                        cutouts=cutouts,
                     )  # side c
                     side(
                         group,

@@ -77,6 +77,8 @@ _ = gettext.gettext
 
 linethickness = 1  # default unless overridden by settings
 
+DEFAULT_COLOR = "#000000"
+INSERT_HOLE_COLOR = "#777777"
 
 GROUP_ID = 7
 COLOR = 8
@@ -103,7 +105,7 @@ def newGroup(canvas, group_id=None):
     return group
 
 
-def getLine(XYstring, color="#000000"):
+def getLine(XYstring, color=DEFAULT_COLOR):
     line = inkex.PathElement()
     line.style = {
         "stroke": color,
@@ -122,7 +124,7 @@ def getCircle(r, c):
     log("putting circle at (%d,%d)" % (cx, cy))
     circle = inkex.PathElement.arc((cx, cy), r)
     circle.style = {
-        "stroke": "#000000",
+        "stroke": DEFAULT_COLOR,
         "stroke-width": str(linethickness),
         "fill": "none",
     }
@@ -256,7 +258,7 @@ def side(
     isDivider,
     numDividers,
     dividerSpacing,
-    color="#000000",
+    color=DEFAULT_COLOR,
     cutouts=None,
     labels=None,
 ):
@@ -375,7 +377,7 @@ def side(
                 Dx = Dx - notDirX * (secondVec - kerf)
                 Dy = Dy - notDirY * (secondVec + kerf)
                 h += "L " + str(Dx) + "," + str(Dy) + " "
-                group.add(getLine(h, color))
+                group.add(getLine(h, INSERT_HOLE_COLOR))
         if tabDivision % 2:
             if (
                 tabDivision == 1 and numDividers > 0 and isDivider
@@ -407,7 +409,7 @@ def side(
                     Dx = Dx - notDirX * (thickness - kerf)
                     Dy = Dy - notDirY * (thickness - kerf)
                     h += "L " + str(Dx) + "," + str(Dy) + " "
-                    group.add(getLine(h, color))
+                    group.add(getLine(h, INSERT_HOLE_COLOR))
             # draw the gap
             vectorX += (
                 dirX
@@ -508,7 +510,7 @@ def side(
             Dx = Dx - notDirX * (thickness - kerf)
             Dy = Dy - notDirY * (thickness - kerf)
             h += "L " + str(Dx) + "," + str(Dy) + " "
-            group.add(getLine(h, color))
+            group.add(getLine(h, INSERT_HOLE_COLOR))
         # for dividerNumber in range(1,int(numDividers)+1):
         #   Dx=vectorX+-dirY*dividerSpacing*dividerNumber+notDirX*halfkerf+dirX*dogbone*halfkerf
         #   Dy=vectorY+dirX*dividerSpacing*dividerNumber-notDirY*halfkerf+dirY*dogbone*halfkerf
@@ -1199,7 +1201,7 @@ class BoxMaker(inkex.Effect):
 
             color = piece[COLOR]
             if color is None:
-                color = "#000000"
+                color = DEFAULT_COLOR
 
             div_cutouts = piece[DIV_CUTOUTS]
 
